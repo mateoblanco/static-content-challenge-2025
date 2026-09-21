@@ -4,8 +4,11 @@
   "version": "1.0.0",
   "description": "**NB: Please do not fork this repository, to avoid your solution being visible from this repository's GitHub page. Please clone this repository and submit your solution as a separate repository.**",
   "main": "index.js",
+  "engines": { "node": ">=20" },
   "scripts": {
-    "dev": "tsx watch src/server.ts"
+    "dev": "tsx watch --env-file=.env src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
   },
   "repository": {
     "type": "git",
@@ -24,6 +27,7 @@
   },
   "dependencies": {
     "express": "^5.2.1",
+    "helmet": "^8.3.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-markdown": "^10.1.0"
