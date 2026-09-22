@@ -7,7 +7,7 @@ const getStatus = (err: unknown): number => {
   if (err instanceof HttpError) return err.status;
   const status = (err as { status?: unknown }).status;
   return typeof status === 'number' && status >= 400 && status < 600 ? status : 500;
-}
+};
 
 export function errorHandler(layout: Layout) {
   return (err: unknown, _req: Request, res: Response, next: NextFunction) => {

@@ -1,9 +1,9 @@
-import express, { type Response } from 'express';
+import express from 'express';
 import path from 'node:path';
 import type { AppConfig } from './config.js';
 import { NotFoundError } from './errors.js';
 import { loadMarkdown } from './helpers/loadPage.js';
-import { renderNotFound, renderPage } from './render/render.js';
+import { renderPage } from './render/render.js';
 import { loadTemplate } from './render/template.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import helmet from 'helmet';
@@ -13,14 +13,8 @@ export const createApp = ({ contentDir, templatePath, publicDir }: AppConfig) =>
   const root = path.resolve(contentDir);
   const layout = loadTemplate(templatePath);
 
-  app.use(express.static(publicDir, { index: false }));
-
-  const sendHtml = (res: Response, status: number, body: string) => {
-   return res.status(status).type('html').send(layout(body));
-  }
-
-
   app.use(helmet());
+  app.use(express.static(publicDir, { index: false }));
 
   app.get('/{*splat}', async (req, res) => {
     const segments = ((req.params.splat as string[] | undefined) ?? []).filter(Boolean);
@@ -32,22 +26,12 @@ export const createApp = ({ contentDir, templatePath, publicDir }: AppConfig) =>
       return;
     }
 
-    try {
-      const markdown = await loadMarkdown(root, segments);
-      sendHtml(res, 200, renderPage(markdown));
-    } catch (err) {
-      if (err instanceof NotFoundError) {
-        sendHtml(res, 404, renderNotFound());
-        return;
-      }
-      throw err;
-    }
+    const markdown = await loadMarkdown(root, segments); // si no existe, lanza NotFoundError
+    res.type('html').send(layout(renderPage(markdown)));
   });
 
-  app.use((_req, _res, next) => next(new NotFoundError()));
-
+  app.use((_req, _res, next) => next(new NotFoundError())); // lo que no matcheó (ej. un POST)
   app.use(errorHandler(layout));
 
-
   return app;
-}
+};
