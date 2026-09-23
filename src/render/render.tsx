@@ -1,6 +1,8 @@
 import { renderToString } from 'react-dom/server';
 import Page from './components/Page.js';
 import Message from './components/Message.js';
+import { ContentEntry } from '../helpers/loadPage.js';
+import HomePage from './components/HomePage.js';
 
 
 export const renderNotFound = (): string => {
@@ -22,4 +24,8 @@ export const renderBadRequest = () =>
 
 export const renderPage = (markdown: string): string => {
   return renderToString(<Page markdown={markdown} />);
+}
+
+export const renderIndex = (pages: ContentEntry[]) =>{
+  return renderToString(<HomePage pages={pages} />);
 }

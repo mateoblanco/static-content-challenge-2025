@@ -2,8 +2,8 @@ import express from 'express';
 import path from 'node:path';
 import type { AppConfig } from './config.js';
 import { NotFoundError } from './errors.js';
-import { loadMarkdown } from './helpers/loadPage.js';
-import { renderPage } from './render/render.js';
+import { getContentPages, loadMarkdown } from './helpers/loadPage.js';
+import { renderIndex, renderPage } from './render/render.js';
 import { loadTemplate } from './render/template.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import helmet from 'helmet';
@@ -13,7 +13,14 @@ export const createApp = ({ contentDir, templatePath, publicDir }: AppConfig) =>
   const root = path.resolve(contentDir);
   const layout = loadTemplate(templatePath);
 
-  app.use(helmet());
+  // Safari applies Helmet's `upgrade-insecure-requests` directive to
+  // localhost too. This made it rewrite the CSS and page links from HTTP to
+  // HTTPS even though the development server only speaks HTTP.
+  app.use(helmet({
+    contentSecurityPolicy: process.env.NODE_ENV === 'production'
+      ? undefined
+      : { directives: { 'upgrade-insecure-requests': null } },
+  }));
   app.use(express.static(publicDir, { index: false }));
 
   app.get('/{*splat}', async (req, res) => {
@@ -26,11 +33,17 @@ export const createApp = ({ contentDir, templatePath, publicDir }: AppConfig) =>
       return;
     }
 
-    const markdown = await loadMarkdown(root, segments); // si no existe, lanza NotFoundError
+    if (segments.length === 0) {
+      const pages = await getContentPages(root);
+      res.type('html').send(layout(renderIndex(pages)));
+      return;
+    }
+
+    const markdown = await loadMarkdown(root, segments);
     res.type('html').send(layout(renderPage(markdown)));
   });
 
-  app.use((_req, _res, next) => next(new NotFoundError())); // lo que no matcheó (ej. un POST)
+  app.use((_req, _res, next) => next(new NotFoundError()));
   app.use(errorHandler(layout));
 
   return app;

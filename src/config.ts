@@ -13,7 +13,7 @@ type ServerConfig = AppConfig & {
 
 export const loadConfig = (env = process.env): ServerConfig => {
   const port = Number(env.PORT ?? 3000);
-  if (!Number.isInteger(port) || port <= 0) {
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
     throw new Error(`Invalid PORT: ${env.PORT}`);
   }
   return {

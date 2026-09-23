@@ -23,6 +23,8 @@ beforeAll(async () => {
     path.join(contentDir, 'blog', 'june', 'company-update', 'index.md'),
     '# Company update',
   );
+  await mkdir(path.join(contentDir, 'release #1'), { recursive: true });
+  await writeFile(path.join(contentDir, 'release #1', 'index.md'), '# Release #1');
   await writeFile(path.join(root, 'secret.txt'), 'confidential content');
 
   app = createApp({ contentDir, templatePath, publicDir: path.join(root, 'public') });
@@ -41,6 +43,12 @@ describe('GET valid URL', () => {
     expect(res.text).toContain('<h1>About us</h1>');
     expect(res.text).not.toContain('{{content}}');
   });
+
+  it('does not upgrade local HTTP requests to HTTPS outside production', async () => {
+    const res = await request(app).get('/about');
+
+    expect(res.headers['content-security-policy']).not.toContain('upgrade-insecure-requests');
+  });
 });
 
 describe('hot content addition', () => {
@@ -53,6 +61,16 @@ describe('hot content addition', () => {
     const res = await request(app).get('/new-page');
     expect(res.status).toBe(200);
     expect(res.text).toContain('<h1>New page</h1>');
+  });
+});
+
+describe('content index', () => {
+  it('encodes special characters in page URLs', async () => {
+    const res = await request(app).get('/');
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('href="/release%20%231"');
+    expect(res.text).toContain('>release #1</a>');
   });
 });
 

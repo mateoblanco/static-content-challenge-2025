@@ -15,7 +15,7 @@ const renderBody = (status: number): string => {
   return renderNotFound();
 }
 
-export function errorHandler(layout: Layout) {
+export const errorHandler = (layout: Layout) => {
   return (err: unknown, _req: Request, res: Response, next: NextFunction) => {
     if (res.headersSent) {
       next(err);
