@@ -100,3 +100,32 @@ describe('folder without its own index.md', () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe('symlinks escaping contentDir', () => {
+  it('returns 404 if index.md is a symlink outside of contentDir', async () => {
+    const contentDir = path.join(root, 'content');
+    const outsideFile = path.join(root, 'outside.txt');
+    await writeFile(outsideFile, 'outside of contentDir');
+
+    await mkdir(path.join(contentDir, 'leak'), { recursive: true });
+
+    const { symlink } = await import('node:fs/promises');
+    await symlink(outsideFile, path.join(contentDir, 'leak', 'index.md'));
+
+    const res = await request(app).get('/leak');
+    expect(res.status).toBe(404);
+    expect(res.text).not.toContain('outside of contentDir');
+  });
+});
+
+describe('4xx errors', () => {
+  it('shows a different message for 400 than for 404', async () => {
+    const badRequest = await request(app).get('/%E0%A4%A');
+    expect(badRequest.status).toBe(400);
+    expect(badRequest.text).toContain('Bad request');
+
+    const notFound = await request(app).get('/no-existe');
+    expect(notFound.status).toBe(404);
+    expect(notFound.text).toContain('Page not found');
+  });
+});

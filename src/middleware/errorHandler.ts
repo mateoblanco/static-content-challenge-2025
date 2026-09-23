@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import { HttpError } from '../errors.js';
-import { renderNotFound, renderServerError } from '../render/render.js';
+import { renderBadRequest, renderNotFound, renderServerError } from '../render/render.js';
 import type { Layout } from '../render/template.js';
 
 const getStatus = (err: unknown): number => {
@@ -8,6 +8,12 @@ const getStatus = (err: unknown): number => {
   const status = (err as { status?: unknown }).status;
   return typeof status === 'number' && status >= 400 && status < 600 ? status : 500;
 };
+
+const renderBody = (status: number): string => {
+  if (status >= 500) return renderServerError();
+  if (status === 400) return renderBadRequest();
+  return renderNotFound();
+}
 
 export function errorHandler(layout: Layout) {
   return (err: unknown, _req: Request, res: Response, next: NextFunction) => {
@@ -19,7 +25,7 @@ export function errorHandler(layout: Layout) {
     const status = getStatus(err);
     if (status >= 500) console.error(err);
 
-    const body = status < 500 ? renderNotFound() : renderServerError();
+    const body = renderBody(status);
     res.status(status).type('html').send(layout(body));
   };
 }
