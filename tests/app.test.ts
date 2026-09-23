@@ -13,6 +13,7 @@ beforeAll(async () => {
 
   const contentDir = path.join(root, 'content');
   const templatePath = path.join(root, 'template.html');
+  const publicDir = path.join(root, 'public');
 
   await writeFile(templatePath, '<!doctype html><html><body>{{content}}</body></html>');
 
@@ -25,9 +26,13 @@ beforeAll(async () => {
   );
   await mkdir(path.join(contentDir, 'release #1'), { recursive: true });
   await writeFile(path.join(contentDir, 'release #1', 'index.md'), '# Release #1');
+  await mkdir(path.join(contentDir, 'assets'), { recursive: true });
+  await writeFile(path.join(contentDir, 'assets', 'index.md'), '# Assets page');
+  await mkdir(path.join(publicDir, 'assets'), { recursive: true });
+  await writeFile(path.join(publicDir, 'assets', 'icon.svg'), '<svg></svg>');
   await writeFile(path.join(root, 'secret.txt'), 'confidential content');
 
-  app = createApp({ contentDir, templatePath, publicDir: path.join(root, 'public') });
+  app = createApp({ contentDir, templatePath, publicDir });
 });
 
 afterAll(() => rm(root, { recursive: true, force: true }));
@@ -89,6 +94,29 @@ describe('trailing slash', () => {
   });
 });
 
+describe('static assets', () => {
+  it('serves public files from the reserved /static prefix', async () => {
+    const res = await request(app).get('/static/assets/icon.svg');
+
+    expect(res.status).toBe(200);
+    expect(res.type).toBe('image/svg+xml');
+  });
+
+  it('does not redirect requests for public directories', async () => {
+    const res = await request(app).get('/static/assets').redirects(0);
+
+    expect(res.status).toBe(404);
+    expect(res.headers.location).toBeUndefined();
+  });
+
+  it('does not let public directory names shadow content pages', async () => {
+    const res = await request(app).get('/assets');
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('<h1>Assets page</h1>');
+  });
+});
+
 describe('path traversal attempts', () => {
   it('returns 404 for ../ encoded, without exposing the file', async () => {
     const res = await request(app).get('/%2e%2e/secret.txt');
@@ -100,6 +128,12 @@ describe('path traversal attempts', () => {
     const res = await request(app)
       .get('/about/../../secret.txt')
       .redirects(0);
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 404 for a null byte', async () => {
+    const res = await request(app).get('/%00');
+
     expect(res.status).toBe(404);
   });
 });

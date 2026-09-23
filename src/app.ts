@@ -21,7 +21,8 @@ export const createApp = ({ contentDir, templatePath, publicDir }: AppConfig) =>
       ? undefined
       : { directives: { 'upgrade-insecure-requests': null } },
   }));
-  app.use(express.static(publicDir, { index: false }));
+  app.use('/static', express.static(publicDir, { index: false, redirect: false }));
+  app.use('/static', (_req, _res, next) => next(new NotFoundError()));
 
   app.get('/{*splat}', async (req, res) => {
     const segments = ((req.params.splat as string[] | undefined) ?? []).filter(Boolean);
