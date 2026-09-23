@@ -2,22 +2,22 @@
   "type": "module",
   "name": "static-content-challenge-2025",
   "version": "1.0.0",
-  "description": "**NB: Please do not fork this repository, to avoid your solution being visible from this repository's GitHub page. Please clone this repository and submit your solution as a separate repository.**",
-  "main": "index.js",
+  "description": "A folder-based static content CMS built with Express, React, and TypeScript.",
+  "private": true,
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "dev": "tsx watch --env-file=.env src/server.ts",
+    "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "vitest run"
+    "test": "tsc -p tests/tsconfig.json && vitest run"
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com-pensionbee:PensionBee/static-content-challenge-2025.git"
+    "url": "https://github.com/mateoblanco/static-content-challenge-2025.git"
   },
-  "author": "PensionBee Limited",
+  "author": "Mateo Blanco",
   "license": "ISC",
   "packageManager": "yarn@1.22.22+sha1.ac34549e6aa8e7ead463a7407e1c7390f61a6610",
   "devDependencies": {

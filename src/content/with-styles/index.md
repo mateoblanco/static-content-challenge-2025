@@ -1,72 +1,72 @@
-# Título principal (h1)
+# Main title (h1)
 
-Un párrafo normal con **negrita**, *cursiva*, ***negrita y cursiva***, y `código en línea`. También un [link a un sitio externo](https://example.com) y un link [con título](https://example.com "Un tooltip").
+A normal paragraph with **bold**, *italic*, ***bold and italic***, and `inline code`. Also a [link to an external site](https://example.com) and a link [with a title](https://example.com "A tooltip").
 
-## Sección (h2)
+## Section (h2)
 
-Otro párrafo, esta vez con una URL larga para probar el corte de línea en pantallas chicas: https://example.com/una/ruta/bastante/larga/que/no/deberia/generar/scroll/horizontal
+Another paragraph, this time with a long URL to test line wrapping on small screens: https://example.com/a/fairly/long/path/that/should/not/cause/horizontal/scroll
 
-### Subsección (h3)
+### Subsection (h3)
 
-#### Un h4, por si acaso
+#### An h4, just in case
 
-##### Un h5
+##### An h5
 
-###### Un h6
+###### An h6
 
-## Listas
+## Lists
 
-Lista sin orden:
+Unordered list:
 
-- Primer item
-- Segundo item con **negrita** adentro
-- Tercer item
-  - Sub-item anidado
-  - Otro sub-item
-    - Un tercer nivel
+- First item
+- Second item with **bold** inside
+- Third item
+  - Nested sub-item
+  - Another sub-item
+    - A third level
 
-Lista ordenada:
+Ordered list:
 
-1. Primer paso
-2. Segundo paso
-3. Tercer paso
-   1. Sub-paso anidado
-   2. Otro sub-paso
+1. First step
+2. Second step
+3. Third step
+   1. Nested sub-step
+   2. Another sub-step
 
-## Cita
+## Quote
 
-> Esta es una cita simple.
+> This is a simple quote.
 >
-> Con más de un párrafo adentro, para ver el espaciado.
+> With more than one paragraph inside, to check the spacing.
 
-Una cita anidada:
+A nested quote:
 
-> Nivel uno
+> Level one
 >
-> > Nivel dos, anidado
+> > Level two, nested
 
-## Código
+## Code
 
-Un bloque de código sin lenguaje especificado:
+A code block with no language specified:
 
 ```
-function suma(a, b) {
+function sum(a, b) {
   return a + b;
 }
 ```
 
-## Separador
+## Separator
 
-Arriba de esta línea hay un párrafo, abajo un separador horizontal.
+Above this line there is a paragraph, below a horizontal rule.
 
 ---
 
-Y este es el contenido después del separador.
+And this is the content after the separator.
 
-## Imagen (sin soporte todavía)
+## Image (not supported yet)
 
-![Texto alternativo de una imagen](./foto.jpg)
+![Alternative text for an image](./foto.jpg)
 
-## Texto plano largo, para el line-height
+## Long plain text, for line-height
 
-Este es un párrafo bastante largo para verificar el interlineado y el ancho máximo de línea en pantallas grandes. Sirve para confirmar que el texto no se hace excesivamente ancho y que la lectura sigue siendo cómoda incluso cuando hay varias oraciones seguidas dentro del mismo párrafo, algo que suele pasar en contenido real de marketing.
+This is a fairly long paragraph to verify line height and maximum line width on large screens. It helps confirm that the text does not become excessively wide and that reading stays comfortable even when there are several sentences in a row within the same paragraph, something that often happens in real marketing content.

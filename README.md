@@ -1,37 +1,144 @@
-# Static Content challenge
+# Acme Static Content CMS
 
-**NB: Please do not fork this repository, to avoid your solution being visible from this repository's GitHub page. Please clone this repository and submit your solution as a separate repository.**
+A minimal full-stack JavaScript application that serves web pages from a folder-based content structure. Each folder under `content/` (and its sub-folders) maps directly to a URL. The page's HTML is built by combining a shared `template.html` layout with the Markdown content found in that folder's `index.md`.
 
-Business Scenario: Acme Co's marketing department want a simple content management system and you've been tasked with building the MVP.
+**Core flow:** Request `/blog/june/company-update` → resolve to `content/blog/june/company-update/index.md` → render the Markdown as React → inject the resulting HTML into `template.html` at `{{content}}` → respond.
 
-The challenge here is to create a full-stack JavaScript application that returns webpages at URLs that match the paths of the folders and sub-folders in the `content` folder. The content of these pages should come from a combination of the template HTML file and a markdown file containing the content.
+Marketing can add, rename, or remove pages by adding folders and `index.md` files — no code changes required.
 
-For example, for a folder called `about-page`, a request to `/about-page` would return a HTML page created from the `template.html` template and the `about-page/index.md` content file. The `template.html` file contains a `{{content}}` placeholder that would be replaced by the content for each page. A request to `/blog/june/company-update` would return a HTML page using the content file at `blog/june/company-update/index.md`.
+**Live demo:** https://static-content-challenge-2025.onrender.com
 
-As a modern full-stack JavaScript app MVP, the application should use an effective mix of technologies, although there is a requirement to use React on the front-end to fit in with Acme Co's other websites.
+## Tech Stack
 
-Acme's marketing department should be able to add extra folders to the `content` folder and the application should work with those without any requiring any code changes.
+| Layer | Technology |
+|---|---|
+| Language | TypeScript |
+| Server | Express 5 |
+| UI / Rendering | React (server-side rendering via `react-dom/server`) |
+| Markdown | `react-markdown` |
+| Security headers | Helmet |
+| Testing | Vitest + Supertest |
+| Package manager | Yarn |
+| Deployment | Render (Web Service) |
 
-This repository contains a `template.html` template file and a sample `content` folder with sub-folders containing `index.md` markdown files (or other sub-folders).
+## Getting Started
 
-Your application may make use of open-source code libraries and other third-party tools. It is entirely up to you how the application performs the challenge. As the use of LLMs is widespread in software engineering, you are permitted to use AI as you wish.
+### Prerequisites
 
-## Testing
+- Node.js 20+
+- Yarn
 
-The application should be shipped with at minimum three tests, although your testing strategy should effectively test your application:
+### Environment Variables
 
-- one that verifies that requests to valid URLs return a 200 HTTP status code
-- one that verifies that requests to valid URLs return a body that contains the HTML generated from the relevant `index.md` markdown file
-- one that verifies that requests to URLs that do not match content folders return a 404 HTTP status code
-- NB: the tests should not depend on the existing sub-folders in the `content` folder, so the tests do not break as the content changes
+None are required to run locally — every filesystem path has a sensible default anchored to the project root, independently of the current working directory. Relative path overrides are also resolved from the project root. Render needs none of these to be set manually; it only injects `PORT`. Override a value through the shell or your deployment environment when needed (for example, `PORT=4000 yarn dev`).
 
-## Bonus credit
+| Variable | Purpose | Default |
+|---|---|---|
+| `PORT` | Port the server listens on | `3000` |
+| `CONTENT_DIR` | Root folder scanned for content | `src/content` |
+| `TEMPLATE_PATH` | HTML template with the `{{content}}` placeholder | `src/render/template.html` |
+| `PUBLIC_DIR` | Static assets folder (CSS, etc.) | `public` |
 
-**NB: This is only relevant if completing this task in your own time, i.e. NOT in a pairing interview**
+### Commands
 
-In this MVP sprint, there are several opportunities to deliver nice-to-have tickets. The marketing team recognise that in a post-LLM world sprint velocity may be higher.
+```bash
+yarn install                # Install the locked dependencies
+yarn dev                    # Start the hot-reloading server at localhost:3000
+yarn build                  # Compile src/ TypeScript to dist/
+yarn start                  # Run the compiled server (dist/server.js)
+yarn test                   # Run the Vitest suite
+```
 
-- The generated HTML page should be styled in a pleasing way
-- The MVP's GitHub repository should be configured for hosting on a cloud hosting service, and include a link to a live deployment
-- The repository should include documentation describing how to both use the application and how to iterate it from here
-- Overall, you should do everything you think is necessary to make this application MVP production-ready
+`yarn dev` uses `tsx watch` and reflects `.ts`/`.tsx` changes immediately. It does not require an `.env` file. Markdown is read on each request, while changes to `src/render/template.html` require a server restart. `yarn start` runs the compiled output in `dist/`; run `yarn build` again after any code change before using it.
+
+### Adding a page (for the marketing team)
+
+1. Create a folder anywhere under `src/content/` (nesting is supported).
+2. Add an `index.md` file inside it with the page's content in Markdown.
+3. Commit and push. The page becomes available at the URL matching the folder path (e.g. `content/about-page/` → `/about-page`) — no code changes or redeploy steps beyond the normal push are needed.
+4. The homepage (`/`) automatically lists every page that has an `index.md`, generated by scanning `content/` on each request — it does not need to be updated by hand.
+
+A folder with sub-folders but no `index.md` of its own (e.g. `content/blog/`) is not itself a page and returns a 404 if requested directly.
+
+Application-owned CSS, icons, and other public files are available under `/static`. Content pages are resolved first, so marketing may still create folders such as `content/static/`, `content/assets/`, or `content/favicon/`. If a content page and a public file have the exact same URL, the content page takes precedence and the public file is used only as a fallback.
+
+## Architecture
+
+### Project Structure
+
+```
+src/
+├── server.ts                 # Entry point: loads config, creates the app, listens
+├── app.ts                    # Express app: middleware, the single content route
+├── config.ts                 # Loads configuration from environment variables
+├── errors.ts                 # HttpError / NotFoundError
+├── helpers/
+│   ├── loadPage.ts           # loadMarkdown and recursive content-page discovery
+│   └── resolveContentPath.ts # Defensively resolves URL segments inside content/
+├── render/
+│   ├── render.tsx            # renderPage / renderIndex / renderNotFound / renderServerError / renderBadRequest
+│   ├── template.html          # Shared HTML layout ({{content}} placeholder)
+│   ├── template.ts           # Loads template.html, injects {{content}}
+│   └── components/
+│       ├── Page.tsx          # Renders a content page's Markdown
+│       ├── HomePage.tsx      # Renders the auto-generated homepage listing
+│       └── Message.tsx       # Shared layout for error pages
+├── middleware/
+│   └── errorHandler.ts       # Single place deciding HTTP status + error page
+└── content/                  # Sample content folders (index.md files)
+public/                        # Static files served under /static
+├── reset.css                  # CSS reset
+├── styles.css                 # Site styling
+├── assets/                    # Social-media SVGs
+└── favicon/                   # Browser and web-app icons
+tests/
+└── app.test.ts                # HTTP-level tests (Supertest + Vitest)
+dist/                           # Generated JavaScript output (yarn build  not source)
+```
+
+### Key Patterns
+
+- **Config is read at startup, not per-request.** `loadConfig()` resolves `PORT`/`CONTENT_DIR`/`TEMPLATE_PATH`/`PUBLIC_DIR` once, anchors relative filesystem paths to the project root, and rejects an invalid port. `createApp()` then loads the template and fails fast if it is missing or does not contain `{{content}}`.
+- **URL → filesystem resolution is isolated and defensive.** `resolveContentDir` (a pure function) rejects `..`, null bytes, hidden segments (`.git`, etc.), and decoded path separators at the string level. `loadMarkdown` adds a second layer on top: it resolves the real path of the target file with `fs.realpath` and rejects anything whose real path falls outside the real path of `contentDir` — this is what catches a symlink planted inside `content/` pointing outside of it (see **Security** below).
+- **Errors are thrown, not handled inline.** Route code throws `NotFoundError` (or lets unexpected errors propagate)  a single Express error-handling middleware (`errorHandler.ts`) decides the HTTP status and renders the corresponding page (400 / 404 / 500). This keeps the route handler focused on the happy path and guarantees consistent error pages everywhere, including from `express.static`.
+- **The template is read once at startup**, not per request, for performance  changing `template.html` requires restarting the dev server.
+- **The homepage is generated, not hardcoded.** `getContentPages` recursively scans `contentDir` for folders containing an `index.md` and renders a link list — consistent with the requirement that adding content requires no code changes.
+- **Content owns the URL namespace.** Requests are checked for a matching content page first. A missing path under `/static` then falls back to `public/`, with directory redirects disabled. This lets content use any folder name while keeping application assets at predictable URLs.
+- **Content URLs are canonical.** Trailing or duplicate slashes redirect to the encoded folder URL, while encoded slash characters inside a segment are rejected rather than being interpreted as extra folders.
+
+### Content Security
+
+Two real issues were found and fixed during development while reviewing the implementation (see **AI Usage** below for how this review was done):
+
+1. **Symlink escape.** The initial path-resolution logic validated the URL-derived path as a string, but `readFile` still followed symlinks. A symlink placed inside `content/` pointing to a file outside of it (e.g. `/etc/passwd`) was served with a `200` — confirmed by reproducing it locally before the fix. **Fix:** `loadMarkdown` now compares `fs.realpath` of the resolved file against `fs.realpath` of `contentDir` before reading it, rejecting anything that escapes. Covered by a regression test.
+2. **Error responses leaked no information**, but all 4xx statuses (including malformed-URL `400`s) rendered the same "Page not found" copy. Fixed by rendering a distinct message for `400` vs `404`/other 4xx.
+
+**Raw HTML in Markdown is not sanitized with `rehype-sanitize` — by design, not by omission.** `react-markdown` does not interpret embedded HTML by default (it's escaped as plain text), so there is nothing to sanitize today. If raw HTML support were added later via `rehype-raw`, `rehype-sanitize` would need to be added alongside it.
+
+### Testing Strategy
+
+Beyond the three tests required by the brief (200 on a valid URL, response body containing the rendered HTML, 404 on an unknown URL), the suite covers:
+
+- **Nested routes** (`/blog/june/company-update`) — the multi-level example from the brief.
+- **A folder without its own `index.md`** (an intermediate folder like `/blog`) — returns 404 rather than a 200 or 500.
+- **Path traversal** — direct unit tests exercise `resolveContentDir` with parent traversal, hidden segments, null bytes, and decoded path separators instead of relying on an HTTP client that normalizes `..` before sending the request.
+- **Symlink escape** — regression test for the fix described above.
+- **Content added after the app is already running** — directly exercises the "no code changes to add a page" requirement.
+- **Canonical redirects** for trailing and duplicate slashes, including query string preservation.
+- **Static routing isolation and precedence** — public files are available under `/static`, directory requests do not loop, and content pages may use `/static` or override the exact URL of a public file.
+
+All HTTP-level tests build their own content and template in a temporary directory (`fs.mkdtemp`) created in `beforeAll` and removed in `afterAll`, so **the suite never depends on the folders under `src/content/`** — verified by running the full suite with that folder temporarily renamed.
+
+## Trade-offs and Decisions
+
+- **Express + server-rendered React, not Next.js or a Vite SPA.** The brief requires returning a specific `template.html` document (with a `{{content}}` placeholder) and specific HTTP status codes per request. A client-rendered SPA can't return a real `404` status, and a framework like Next.js wants to own the full HTML document, conflicting with using the given template as-is. Express plus `react-dom/server`'s `renderToString` satisfies the React requirement (pages are genuine React components) while respecting the template and status-code requirements exactly.
+- **React is used for server-side rendering only  no client-side hydration.** Pages are static content with no interactive behavior needed, so there is no client-side React runtime shipped. If interactivity were needed later, the natural next step is an "island" architecture: bundling and hydrating a single small component client-side (e.g. `hydrateRoot`) rather than hydrating the whole page.
+- **Tables, task lists, strikethrough are not supported**. Not needed by the current sample content  trivial to add if a future `.md` file requires it.
+- **Images/other assets inside content folders are not served.** Serving them safely requires a dedicated static route with an extension allow-list (never `.md`) and a decision on how relative image paths resolve against trailing-slash redirects. Out of scope for this MVP  noted here as a known gap rather than a silent omission.
+- **The compiled `dist/` output is not self-contained.** `tsc` compiles `.ts`/`.tsx` to `dist/`, while `content/`, `template.html`, and `public/` remain in the project tree and are resolved from that root at runtime. This works because the assumed deployment flow (Render, or any platform that clones the full repository) keeps those directories beside `dist/`. It would need to change if `dist/` were ever shipped in isolation (e.g. a minimal Docker image copying only the build output).
+- **The page `<title>` is fixed** ("Acme") across all pages, since it lives in the given `template.html` and the brief only specifies a `{{content}}` placeholder. Per-page titles/meta descriptions would require reading Markdown front matter (e.g. via `gray-matter`) and a second placeholder in the template — a reasonable next step for SEO, left out of this MVP to keep the template's contract minimal.
+- **Helmet is used for baseline security headers** (removing `X-Powered-By`, setting `X-Content-Type-Options`, a default CSP, etc.), even though this app has no cookies, forms, or reflected user input. It's defense-in-depth rather than a fix for a concrete issue, and the default CSP works unmodified since the template has no inline scripts or third-party resources.
+
+## AI Usage
+
+AI (Claude, via chat, and Cursor) was used throughout development as a step-by-step pair rather than for direct code generation: each piece (folder structure, error handling, security, testing) was explained and built incrementally so it could be understood and reviewed, rather than accepting a complete generated solution. Codex was also used to perform code review, including the review that identified the security issues documented above. This was a deliberate trade of speed for understanding, given the week-long window for this exercise.
