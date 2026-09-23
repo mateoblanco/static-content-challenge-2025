@@ -30,7 +30,7 @@ Marketing can add, rename, or remove pages by adding folders and `index.md` file
 
 ### Environment Variables
 
-None are required to run locally — everything has a sensible default relative to the project root. Render also needs none of these to be set manually; it only injects `PORT`. Override a value through the shell or your deployment environment when needed (for example, `PORT=4000 yarn dev`).
+None are required to run locally — every filesystem path has a sensible default anchored to the project root, independently of the current working directory. Relative path overrides are also resolved from the project root. Render needs none of these to be set manually; it only injects `PORT`. Override a value through the shell or your deployment environment when needed (for example, `PORT=4000 yarn dev`).
 
 | Variable | Purpose | Default |
 |---|---|---|
@@ -60,7 +60,7 @@ yarn test                   # Run the Vitest suite
 
 A folder with sub-folders but no `index.md` of its own (e.g. `content/blog/`) is not itself a page and returns a 404 if requested directly.
 
-Application-owned CSS, icons, and other public files are served under the reserved `/static` URL prefix. Content folders remain free to use names such as `assets` or `favicon` without being shadowed by the public-file middleware.
+Application-owned CSS, icons, and other public files are available under `/static`. Content pages are resolved first, so marketing may still create folders such as `content/static/`, `content/assets/`, or `content/favicon/`. If a content page and a public file have the exact same URL, the content page takes precedence and the public file is used only as a fallback.
 
 ## Architecture
 
@@ -98,12 +98,13 @@ dist/                           # Generated JavaScript output (yarn build  not s
 
 ### Key Patterns
 
-- **Config is read at startup, not per-request.** `loadConfig()` resolves `PORT`/`CONTENT_DIR`/`TEMPLATE_PATH`/`PUBLIC_DIR` once and rejects an invalid port. `createApp()` then loads the template and fails fast if it is missing or does not contain `{{content}}`.
-- **URL → filesystem resolution is isolated and defensive.** `resolveContentDir` (a pure function) rejects `..`, null bytes, and hidden segments (`.git`, etc.) at the string level. `loadMarkdown` adds a second layer on top: it resolves the real path of the target file with `fs.realpath` and rejects anything whose real path falls outside the real path of `contentDir` — this is what catches a symlink planted inside `content/` pointing outside of it (see **Security** below).
+- **Config is read at startup, not per-request.** `loadConfig()` resolves `PORT`/`CONTENT_DIR`/`TEMPLATE_PATH`/`PUBLIC_DIR` once, anchors relative filesystem paths to the project root, and rejects an invalid port. `createApp()` then loads the template and fails fast if it is missing or does not contain `{{content}}`.
+- **URL → filesystem resolution is isolated and defensive.** `resolveContentDir` (a pure function) rejects `..`, null bytes, hidden segments (`.git`, etc.), and decoded path separators at the string level. `loadMarkdown` adds a second layer on top: it resolves the real path of the target file with `fs.realpath` and rejects anything whose real path falls outside the real path of `contentDir` — this is what catches a symlink planted inside `content/` pointing outside of it (see **Security** below).
 - **Errors are thrown, not handled inline.** Route code throws `NotFoundError` (or lets unexpected errors propagate)  a single Express error-handling middleware (`errorHandler.ts`) decides the HTTP status and renders the corresponding page (400 / 404 / 500). This keeps the route handler focused on the happy path and guarantees consistent error pages everywhere, including from `express.static`.
 - **The template is read once at startup**, not per request, for performance  changing `template.html` requires restarting the dev server.
 - **The homepage is generated, not hardcoded.** `getContentPages` recursively scans `contentDir` for folders containing an `index.md` and renders a link list — consistent with the requirement that adding content requires no code changes.
-- **Static files have a dedicated namespace.** `public/` is mounted at `/static` with directory redirects disabled, so a public directory cannot create a redirect loop or shadow a content page with the same name.
+- **Content owns the URL namespace.** Requests are checked for a matching content page first. A missing path under `/static` then falls back to `public/`, with directory redirects disabled. This lets content use any folder name while keeping application assets at predictable URLs.
+- **Content URLs are canonical.** Trailing or duplicate slashes redirect to the encoded folder URL, while encoded slash characters inside a segment are rejected rather than being interpreted as extra folders.
 
 ### Content Security
 
@@ -120,11 +121,11 @@ Beyond the three tests required by the brief (200 on a valid URL, response body 
 
 - **Nested routes** (`/blog/june/company-update`) — the multi-level example from the brief.
 - **A folder without its own `index.md`** (an intermediate folder like `/blog`) — returns 404 rather than a 200 or 500.
-- **Path traversal** (`../`, encoded `%2e%2e`, null bytes) — confirms escaping attempts never reach the filesystem outside `contentDir`.
+- **Path traversal** — direct unit tests exercise `resolveContentDir` with parent traversal, hidden segments, null bytes, and decoded path separators instead of relying on an HTTP client that normalizes `..` before sending the request.
 - **Symlink escape** — regression test for the fix described above.
 - **Content added after the app is already running** — directly exercises the "no code changes to add a page" requirement.
-- **Trailing slash redirects**, including query string preservation.
-- **Static routing isolation** — public files are available under `/static`, directory requests do not loop, and a content page may use the same name as a public directory.
+- **Canonical redirects** for trailing and duplicate slashes, including query string preservation.
+- **Static routing isolation and precedence** — public files are available under `/static`, directory requests do not loop, and content pages may use `/static` or override the exact URL of a public file.
 
 All HTTP-level tests build their own content and template in a temporary directory (`fs.mkdtemp`) created in `beforeAll` and removed in `afterAll`, so **the suite never depends on the folders under `src/content/`** — verified by running the full suite with that folder temporarily renamed.
 
@@ -134,7 +135,7 @@ All HTTP-level tests build their own content and template in a temporary directo
 - **React is used for server-side rendering only  no client-side hydration.** Pages are static content with no interactive behavior needed, so there is no client-side React runtime shipped. If interactivity were needed later, the natural next step is an "island" architecture: bundling and hydrating a single small component client-side (e.g. `hydrateRoot`) rather than hydrating the whole page.
 - **Tables, task lists, strikethrough are not supported**. Not needed by the current sample content  trivial to add if a future `.md` file requires it.
 - **Images/other assets inside content folders are not served.** Serving them safely requires a dedicated static route with an extension allow-list (never `.md`) and a decision on how relative image paths resolve against trailing-slash redirects. Out of scope for this MVP  noted here as a known gap rather than a silent omission.
-- **The compiled `dist/` output is not self-contained.** `tsc` compiles `.ts`/`.tsx` to `dist/`, but `content/`, `template.html`, and `public/` are read relative to `process.cwd()` at runtime rather than being copied into `dist/`. This works because the assumed deployment flow (Render, or any platform that clones the repository and runs `yarn start` from its root) always has the full repository present. It would need to change if `dist/` were ever shipped in isolation (e.g. a minimal Docker image copying only the build output).
+- **The compiled `dist/` output is not self-contained.** `tsc` compiles `.ts`/`.tsx` to `dist/`, while `content/`, `template.html`, and `public/` remain in the project tree and are resolved from that root at runtime. This works because the assumed deployment flow (Render, or any platform that clones the full repository) keeps those directories beside `dist/`. It would need to change if `dist/` were ever shipped in isolation (e.g. a minimal Docker image copying only the build output).
 - **The page `<title>` is fixed** ("Acme") across all pages, since it lives in the given `template.html` and the brief only specifies a `{{content}}` placeholder. Per-page titles/meta descriptions would require reading Markdown front matter (e.g. via `gray-matter`) and a second placeholder in the template — a reasonable next step for SEO, left out of this MVP to keep the template's contract minimal.
 - **Helmet is used for baseline security headers** (removing `X-Powered-By`, setting `X-Content-Type-Options`, a default CSP, etc.), even though this app has no cookies, forms, or reflected user input. It's defense-in-depth rather than a fix for a concrete issue, and the default CSP works unmodified since the template has no inline scripts or third-party resources.
 

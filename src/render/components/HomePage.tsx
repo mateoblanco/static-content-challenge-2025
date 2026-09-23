@@ -10,7 +10,7 @@ import type { ContentEntry } from '../../helpers/loadPage.js';
         <ul className="home-list">
           {pages.map((p) => (
             <li key={p.url} className="home-list-item">
-              <a href={p.url}>{p.segments.at(-1)}</a>
+              <a href={p.url}>{p.segments.at(-1)?.replaceAll('-', ' ')}</a>
             </li>
           ))}
         </ul>

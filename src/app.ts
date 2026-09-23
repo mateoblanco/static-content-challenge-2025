@@ -21,16 +21,17 @@ export const createApp = ({ contentDir, templatePath, publicDir }: AppConfig) =>
       ? undefined
       : { directives: { 'upgrade-insecure-requests': null } },
   }));
-  app.use('/static', express.static(publicDir, { index: false, redirect: false }));
-  app.use('/static', (_req, _res, next) => next(new NotFoundError()));
 
-  app.get('/{*splat}', async (req, res) => {
+  app.get('/{*splat}', async (req, res, next) => {
     const segments = ((req.params.splat as string[] | undefined) ?? []).filter(Boolean);
+    const canonicalPath = segments.length === 0
+      ? '/'
+      : '/' + segments.map(encodeURIComponent).join('/');
 
-    if (req.path.length > 1 && req.path.endsWith('/')) {
+    if (req.path !== canonicalPath) {
       const i = req.originalUrl.indexOf('?');
       const query = i === -1 ? '' : req.originalUrl.slice(i);
-      res.redirect(301, '/' + segments.map(encodeURIComponent).join('/') + query);
+      res.redirect(301, canonicalPath + query);
       return;
     }
 
@@ -40,9 +41,21 @@ export const createApp = ({ contentDir, templatePath, publicDir }: AppConfig) =>
       return;
     }
 
-    const markdown = await loadMarkdown(root, segments);
-    res.type('html').send(layout(renderPage(markdown)));
+    try {
+      const markdown = await loadMarkdown(root, segments);
+      res.type('html').send(layout(renderPage(markdown)));
+    } catch (err) {
+      // Content owns the URL namespace. Only fall back to application assets
+      // when no content page exists at the requested /static path.
+      if (err instanceof NotFoundError && segments[0] === 'static') {
+        next();
+        return;
+      }
+      throw err;
+    }
   });
+
+  app.use('/static', express.static(publicDir, { index: false, redirect: false }));
 
   app.use((_req, _res, next) => next(new NotFoundError()));
   app.use(errorHandler(layout));
