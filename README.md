@@ -27,7 +27,7 @@ Marketing can add, rename, or remove pages by adding folders and `index.md` file
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 20.19+, 22.12+, or 24+
 - Yarn
 
 ### Environment Variables
@@ -103,7 +103,7 @@ dist/                           # Generated JavaScript output (yarn build  not s
 ### Key Patterns
 
 - **Config is read at startup, not per-request.** `loadConfig()` resolves `PORT`/`CONTENT_DIR`/`TEMPLATE_PATH`/`PUBLIC_DIR` once, anchors relative filesystem paths to the project root, and rejects an invalid port. `createApp()` then loads the template and fails fast if it is missing or does not contain `{{content}}`.
-- **URL → filesystem resolution is isolated and defensive.** `resolveContentDir` (a pure function) rejects `..`, null bytes, hidden segments (`.git`, etc.), and decoded path separators at the string level. `loadMarkdown` adds a second layer on top: it resolves the real path of the target file with `fs.realpath` and rejects anything whose real path falls outside the real path of `contentDir`. This catches a symlink planted inside `content/` pointing outside of it (see **Security** below).
+- **URL → filesystem resolution is isolated and defensive.** `resolveContentDir` (a pure function) rejects `..`, null bytes, hidden segments (`.git`, etc.), and decoded path separators. `loadMarkdown` also resolves the final filesystem path with `fs.realpath` and ensures it remains inside `contentDir`, preventing traversal and symlink escapes.
 - **Errors are thrown, not handled inline.** Route code throws `NotFoundError` (or lets unexpected errors propagate)  a single Express error-handling middleware (`errorHandler.ts`) decides the HTTP status and renders the corresponding page (400 / 404 / 500). This keeps the route handler focused on the happy path and guarantees consistent error pages everywhere, including from `express.static`.
 - **The template is read once at startup**, not per request, for performance  changing `template.html` requires restarting the dev server.
 - **The homepage is generated, not hardcoded.** `getContentPages` recursively scans `contentDir` for folders containing an `index.md` and renders a link list. This is consistent with the requirement that adding content requires no code changes.
@@ -112,10 +112,7 @@ dist/                           # Generated JavaScript output (yarn build  not s
 
 ### Content Security
 
-Two real issues were found and fixed during development while reviewing the implementation (see **AI Usage** below for how this review was done):
-
-1. **Symlink escape.** The initial path-resolution logic validated the URL-derived path as a string, but `readFile` still followed symlinks. A symlink placed inside `content/` pointing to a file outside of it (e.g. `/etc/passwd`) was served with a `200`. This was confirmed by reproducing it locally before the fix. **Fix:** `loadMarkdown` now compares `fs.realpath` of the resolved file against `fs.realpath` of `contentDir` before reading it, rejecting anything that escapes. Covered by a regression test.
-2. **Error responses leaked no information**, but all 4xx statuses (including malformed-URL `400`s) rendered the same "Page not found" copy. Fixed by rendering a distinct message for `400` vs `404`/other 4xx.
+- **Safe content resolution.** URL-derived paths are validated before reading. The final path is then resolved with `fs.realpath` and checked against `contentDir`, so a symbolic link (symlink) inside `content/` cannot expose files outside it. This is covered by a regression test.
 
 **Raw HTML in Markdown is not sanitized with `rehype-sanitize` by design, not by omission.** `react-markdown` does not interpret embedded HTML by default (it's escaped as plain text), so there is nothing to sanitize today. If raw HTML support were added later via `rehype-raw`, `rehype-sanitize` would need to be added alongside it.
 
@@ -125,8 +122,7 @@ Beyond the three tests required by the brief (200 on a valid URL, response body 
 
 - **Nested routes** (`/blog/june/company-update`): the multi-level example from the brief.
 - **A folder without its own `index.md`** (an intermediate folder like `/blog`): returns 404 rather than a 200 or 500.
-- **Path traversal:** direct unit tests exercise `resolveContentDir` with parent traversal, hidden segments, null bytes, and decoded path separators instead of relying on an HTTP client that normalizes `..` before sending the request.
-- **Symlink escape:** regression test for the fix described above.
+- **Path safety:** direct unit tests cover parent traversal, hidden segments, null bytes, decoded path separators, and symlink escapes.
 - **Content added after the app is already running:** directly exercises the "no code changes to add a page" requirement.
 - **Canonical redirects** for trailing and duplicate slashes, including query string preservation.
 - **Static routing isolation and precedence:** public files are available under `/static`, directory requests do not loop, and content pages may use `/static` or override the exact URL of a public file.

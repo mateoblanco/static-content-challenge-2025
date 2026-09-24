@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { AppConfig } from './config.js';
 import { NotFoundError } from './errors.js';
 import { getContentPages, loadMarkdown } from './helpers/loadPage.js';
+import { resolveContentDir } from './helpers/resolveContentPath.js';
 import { renderIndex, renderPage } from './render/render.js';
 import { loadTemplate } from './render/template.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -24,6 +25,13 @@ export const createApp = ({ contentDir, templatePath, publicDir }: AppConfig) =>
 
   app.get('/{*splat}', async (req, res, next) => {
     const segments = ((req.params.splat as string[] | undefined) ?? []).filter(Boolean);
+
+    // Invalid paths must not fall through to express.static, which can decode
+    // encoded separators differently from the content resolver.
+    if (!resolveContentDir(root, segments)) {
+      throw new NotFoundError();
+    }
+
     const canonicalPath = segments.length === 0
       ? '/'
       : '/' + segments.map(encodeURIComponent).join('/');
