@@ -11,7 +11,7 @@ import type { ContentEntry } from '../../helpers/loadPage.js';
           {pages.map((p) => (
             <li key={p.url} className="home-list-item">
               <a href={p.url}>
-                <p>{p.segments.at(-1)?.replaceAll('-', ' ')}</p>
+                {p.segments.at(-1)?.replaceAll('-', ' ')}
                 {p.firstLine && <p className="home-list-item-preview">{p.firstLine}</p>}
               </a>
             </li>
