@@ -2,7 +2,7 @@ import path from 'node:path';
 import { constants } from 'node:fs';
 import { open, readdir, realpath } from 'node:fs/promises';
 import { NotFoundError } from '../errors.js';
-import { resolveContentDir } from './resolveContentPath.js';
+import { isRoutableContentSegment, resolveContentDir } from './resolveContentPath.js';
 
 export const loadMarkdown = async (root: string, segments: string[]): Promise<string> => {
   const dir = resolveContentDir(root, segments);
@@ -63,7 +63,7 @@ export const getContentPages = async (root: string): Promise<ContentEntry[]> => 
     }
 
     for (const entry of entries) {
-      if (entry.isDirectory() && !entry.name.startsWith('.')) {
+      if (entry.isDirectory() && isRoutableContentSegment(entry.name)) {
         await scanDirectory(path.join(dir, entry.name), [...segments, entry.name]);
       }
     }

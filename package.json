@@ -5,7 +5,7 @@
   "description": "A folder-based static content CMS built with Express, React, and TypeScript.",
   "private": true,
   "engines": {
-    "node": ">=20"
+    "node": "^20.19.0 || ^22.12.0 || >=24.0.0"
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
