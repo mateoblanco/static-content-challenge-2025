@@ -18,7 +18,10 @@ beforeAll(async () => {
   await writeFile(templatePath, '<!doctype html><html><body>{{content}}</body></html>');
 
   await mkdir(path.join(contentDir, 'about'), { recursive: true });
-  await writeFile(path.join(contentDir, 'about', 'index.md'), '# About us');
+  await writeFile(
+    path.join(contentDir, 'about', 'index.md'),
+    '# About us\n\nLearn about our company.',
+  );
   await mkdir(path.join(contentDir, 'blog', 'june', 'company-update'), { recursive: true });
   await writeFile(
     path.join(contentDir, 'blog', 'june', 'company-update', 'index.md'),
@@ -74,6 +77,16 @@ describe('hot content addition', () => {
 });
 
 describe('content index', () => {
+  it('shows the first line of each content file', async () => {
+    const res = await request(app).get('/');
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain(
+      '<p class="home-list-item-preview">Learn about our company.</p>',
+    );
+    expect(res.text).not.toContain('<p class="home-list-item-preview"># About us</p>');
+  });
+
   it('encodes special characters in page URLs', async () => {
     const res = await request(app).get('/');
 

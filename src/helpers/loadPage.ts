@@ -34,6 +34,7 @@ export const loadMarkdown = async (root: string, segments: string[]): Promise<st
 export type ContentEntry = {
   url: string;
   segments: string[];
+  firstLine: string;
 }
 
 export const getContentPages = async (root: string): Promise<ContentEntry[]> => {
@@ -44,7 +45,21 @@ export const getContentPages = async (root: string): Promise<ContentEntry[]> => 
     const hasIndex = entries.some((e) => e.isFile() && e.name === 'index.md');
 
     if (segments.length > 0 && hasIndex) {
-      results.push({ url: '/' + segments.map(encodeURIComponent).join('/'), segments });
+      const indexPath = path.join(dir, 'index.md');
+      const file = await open(indexPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+      try {
+        const markdown = await file.readFile({ encoding: 'utf8' });
+        const firstLine = markdown
+          .split(/\r?\n/)
+          .find((line) => line.trim() && !line.trimStart().startsWith('# ')) ?? '';
+        results.push({
+          url: '/' + segments.map(encodeURIComponent).join('/'),
+          segments,
+          firstLine,
+        });
+      } finally {
+        await file.close();
+      }
     }
 
     for (const entry of entries) {
